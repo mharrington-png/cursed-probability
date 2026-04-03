@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Two Children — A Probability Puzzle</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f7f5f0; --surface: #ffffff; --border: #e2ddd6;
+  --text: #1a1814; --muted: #8a8479; --accent: #2a5caa;
+  --success: #1a6b45;
+  --serif: 'Playfair Display', Georgia, serif;
+  --sans: 'DM Sans', system-ui, sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-weight: 300; min-height: 100vh; }
+header { background: var(--text); color: #f7f5f0; padding: 24px 48px; display: flex; align-items: baseline; gap: 20px; }
+header h1 { font-family: var(--serif); font-size: 26px; font-weight: 600; letter-spacing: -0.3px; }
+header .sub { font-size: 13px; font-weight: 300; opacity: 0.5; letter-spacing: 0.8px; text-transform: uppercase; }
+.shell { max-width: 1100px; margin: 0 auto; padding: 28px 28px 60px; }
+
+/* ── tabs ── */
+.prob-tabs { display: grid; grid-template-columns: repeat(3,1fr); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 24px; background: var(--surface); }
+.prob-tab { padding: 13px 16px; cursor: pointer; border: none; background: var(--surface); text-align: left; font-family: var(--sans); border-right: 1px solid var(--border); transition: background 0.15s; }
+.prob-tab:last-child { border-right: none; }
+.prob-tab .num   { display: block; font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 3px; letter-spacing: 0.5px; }
+.prob-tab .label { display: block; font-size: 13px; font-weight: 500; color: var(--text); line-height: 1.3; }
+.prob-tab .ans   { display: block; font-family: var(--mono); font-size: 16px; font-weight: 500; margin-top: 5px; }
+.prob-tab[data-tab="0"] .ans { color: var(--muted); }
+.prob-tab[data-tab="1"] .ans { color: var(--success); }
+.prob-tab[data-tab="2"] .ans { color: var(--accent); }
+.prob-tab.active { background: var(--text); }
+.prob-tab.active .num, .prob-tab.active .label { color: rgba(247,245,240,0.55); }
+.prob-tab.active[data-tab="0"] .ans { color: #c8c3bb; }
+.prob-tab.active[data-tab="1"] .ans { color: #5dcaa5; }
+.prob-tab.active[data-tab="2"] .ans { color: #85b7eb; }
+.ans-locked .ans { visibility: hidden; }
+
+/* ── panels ── */
+.panel { display: none; }
+.panel.active { display: block; }
+
+.problem-text { font-family: var(--serif); font-size: 20px; line-height: 1.55; padding: 18px 24px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--text); border-radius: 0 8px 8px 0; margin-bottom: 20px; }
+.problem-text em { font-style: italic; color: var(--accent); }
+
+/* ── tree ── */
+.tree-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 20px 10px; }
+.tree-wrap canvas { display: block; width: 100%; cursor: pointer; }
+.hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 6px; font-family: var(--mono); letter-spacing: 0.3px; }
+
+/* ── cards ── */
+.cards-row { display: grid; gap: 16px; margin-top: 20px; }
+.cards-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
+.card h3 { font-family: var(--mono); font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.card p  { font-size: 14px; line-height: 1.6; color: var(--text); font-weight: 300; }
+.card p + p { margin-top: 6px; }
+.card em { font-style: italic; }
+.answer-card { background: var(--text); color: #f7f5f0; border-color: var(--text); }
+.answer-card h3 { color: rgba(247,245,240,0.4); }
+.answer-card p  { color: rgba(247,245,240,0.65); font-size: 13px; }
+.answer-big { font-family: var(--serif); font-size: 52px; font-weight: 600; line-height: 1; margin: 4px 0 8px; letter-spacing: -1px; }
+[data-atab="0"] .answer-big { color: #c8c3bb; }
+[data-atab="1"] .answer-big { color: #5dcaa5; }
+[data-atab="2"] .answer-big { color: #85b7eb; }
+.frac { display: inline-flex; flex-direction: column; align-items: center; font-family: var(--mono); font-size: 13px; line-height: 1.1; }
+.frac .nf { border-bottom: 1px solid currentColor; padding-bottom: 2px; }
+.frac .df { padding-top: 2px; }
+.frow { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.fop { font-family: var(--mono); color: rgba(247,245,240,0.35); }
+
+/* ── legend ── */
+.legend { display: flex; flex-direction: column; gap: 7px; }
+.leg { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text); font-weight: 300; }
+.ldot { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+.ldot.root      { background: #1a1814; }
+.ldot.internal  { background: #fff; border: 1px solid #c8c3bb; }
+.ldot.excluded  { background: #f0ede8; border: 1px solid #e2ddd6; }
+.ldot.qualifies { background: #dde8f8; border: 1px solid #a8c4e8; }
+.ldot.winner    { background: #d6f0e4; border: 1px solid #8dcfb4; }
+
+/* ── hidden-until-reveal ── */
+.hidden-until-reveal { display: none !important; }
+
+/* ── reveal / sim button ── */
+.reveal-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-top: 20px; padding: 14px 24px;
+  background: var(--text); color: #f7f5f0;
+  border: none; border-radius: 10px;
+  font-family: var(--sans); font-size: 15px; font-weight: 500;
+  cursor: pointer; transition: opacity 0.15s; width: 100%;
+}
+.reveal-btn:hover:not(:disabled) { opacity: 0.85; }
+.reveal-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+.reveal-btn.done { background: var(--success); }
+.reveal-btn:disabled { cursor: default; }
+/* simulator link button — appears after reveal on panel 2 */
+.sim-link-btn {
+  display: none; align-items: center; justify-content: center; gap: 10px;
+  margin-top: 12px; padding: 14px 24px;
+  background: var(--accent); color: #f7f5f0;
+  border: none; border-radius: 10px;
+  font-family: var(--sans); font-size: 15px; font-weight: 500;
+  cursor: pointer; transition: opacity 0.15s; width: 100%;
+}
+.sim-link-btn.visible { display: flex; }
+.sim-link-btn:hover { opacity: 0.85; }
+.sim-link-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* ── simulator ── */
+.sim-divider { border: none; border-top: 2px dashed var(--border); margin: 32px 0 28px; }
+.sim-header { font-family: var(--serif); font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.sim-sub { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+
+.sim-step { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin-bottom: 16px; }
+.sim-step h3 { font-family: var(--mono); font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+.trial-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.child-box { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; font-family: var(--mono); font-size: 14px; line-height: 1.9; color: var(--text); background: var(--bg); transition: background 0.3s, border-color 0.3s; }
+.child-box.boy-tue   { background: #d6f0e4; border-color: #8dcfb4; }
+.child-box.boy-other { background: #fff8e6; border-color: #f0c060; }
+.child-box.girl      { background: #f0ede8; border-color: #c8c3bb; }
+.child-box .child-label { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; display: block; margin-bottom: 4px; }
+.child-box .child-val   { font-size: 22px; font-weight: 500; }
+.verdict { margin-top: 14px; padding: 12px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; font-family: var(--mono); }
+.verdict.kept    { background: #dde8f8; color: #1a3d7a; border: 1px solid #a8c4e8; }
+.verdict.dropped { background: #f0ede8; color: #6b5a4a; border: 1px solid #c8c3bb; }
+.verdict.bb      { background: #d6f0e4; color: #1a6b45; border: 1px solid #8dcfb4; }
+.verdict.notbb   { background: #dde8f8; color: #1a3d7a; border: 1px solid #a8c4e8; }
+
+.stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
+.stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; text-align: center; }
+.stat-box .sv { font-family: var(--mono); font-size: 22px; font-weight: 500; color: var(--text); display: block; }
+.stat-box .sl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; display: block; }
+.stat-box.highlight .sv { color: var(--success); }
+
+.sim-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border: none; border-radius: 8px; font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; }
+.sim-btn:hover { opacity: 0.85; }
+.sim-btn.primary   { background: var(--text); color: #f7f5f0; }
+.sim-btn.secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+
+.convergence-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; }
+.convergence-wrap h3 { font-family: var(--mono); font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+@media (max-width: 680px) {
+  .prob-tabs { grid-template-columns: 1fr; }
+  .prob-tab { border-right: none; border-bottom: 1px solid var(--border); }
+  .prob-tab:last-child { border-bottom: none; }
+  .cards-row.cols-3 { grid-template-columns: 1fr; }
+  .stat-row { grid-template-columns: 1fr 1fr; }
+  .trial-grid { grid-template-columns: 1fr; }
+  header { padding: 18px 20px; flex-direction: column; gap: 4px; }
+  .shell { padding: 16px 14px 48px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Two Children</h1>
+  <span class="sub">A Conditional Probability Puzzle</span>
+</header>
+
+<div class="shell">
+
+  <div class="prob-tabs">
+    <button class="prob-tab active ans-locked" data-tab="0" onclick="showPanel(0)">
+      <span class="num">Problem 1</span>
+      <span class="label">At least one boy</span>
+      <span class="ans">1/3</span>
+    </button>
+    <button class="prob-tab ans-locked" data-tab="1" onclick="showPanel(1)">
+      <span class="num">Problem 2</span>
+      <span class="label">A boy opens the door</span>
+      <span class="ans">1/2</span>
+    </button>
+    <button class="prob-tab ans-locked" data-tab="2" onclick="showPanel(2)">
+      <span class="num">Problem 3</span>
+      <span class="label">A boy born on Tuesday</span>
+      <span class="ans">13/27</span>
+    </button>
+  </div>
+
+  <!-- ── PANEL 0 — at least one boy ── -->
+  <div class="panel active" id="panel-0">
+    <div class="problem-text">
+      Mr. Jones has two children. At least one is a boy.
+      What is the probability he has <em>two boys</em>?
+    </div>
+    <div class="tree-wrap">
+      <canvas id="tree0" height="300"></canvas>
+      <p class="hint">Click any node to reveal its branches</p>
+    </div>
+    <div class="cards-row cols-3">
+      <div class="card">
+        <h3>Legend</h3>
+        <div class="legend">
+          <div class="leg"><div class="ldot root"></div>Click to expand branches</div>
+          <div class="leg"><div class="ldot internal"></div>Click to expand branches</div>
+          <div class="leg"><div class="ldot excluded"></div>Pruned — ruled out by condition</div>
+          <div class="leg"><div class="ldot qualifies"></div>Qualifies — not two boys</div>
+          <div class="leg"><div class="ldot winner"></div>Two boys — counts toward answer</div>
+        </div>
+      </div>
+      <div class="card answer-card hidden-until-reveal" id="ac-0" data-atab="0">
+        <h3>Answer</h3>
+        <div class="answer-big">1/3</div>
+        <p>One of three equally-weighted qualifying outcomes is B,B.</p>
+        <div class="frow">
+          <span class="frac" style="color:#c8c3bb"><span class="nf">1</span><span class="df">3</span></span>
+          <span class="fop">=</span>
+          <span class="frac" style="color:#c8c3bb"><span class="nf">¼</span><span class="df">¼+¼+¼</span></span>
+        </div>
+      </div>
+      <div class="card hidden-until-reveal" id="exp-0">
+        <h3>Why not 1/2?</h3>
+        <p>There are <em>two</em> ways to have exactly one boy: G,B and B,G. Birth order matters — they are distinct outcomes each with probability ¼.</p>
+        <p>G,G is ruled out, leaving <strong>three</strong> equally-likely qualifying outcomes — not two.</p>
+      </div>
+    </div>
+    <button class="reveal-btn" id="reveal-0" onclick="reveal(0)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Reveal answer
+    </button>
+  </div>
+
+  <!-- ── PANEL 1 — opens door ── -->
+  <div class="panel" id="panel-1">
+    <div class="problem-text">
+      Mr. Jones has two children. You knock on the door; one child (chosen at random) opens it. It is a boy.
+      What is the probability he has <em>two boys</em>?
+    </div>
+    <div class="tree-wrap">
+      <canvas id="tree1" height="360"></canvas>
+      <p class="hint">Click any node to reveal its branches</p>
+    </div>
+    <div class="cards-row cols-3">
+      <div class="card">
+        <h3>Legend</h3>
+        <div class="legend">
+          <div class="leg"><div class="ldot root"></div>Click to expand branches</div>
+          <div class="leg"><div class="ldot internal"></div>Click to expand branches</div>
+          <div class="leg"><div class="ldot excluded"></div>Pruned — boy didn't open door</div>
+          <div class="leg"><div class="ldot qualifies"></div>Boy opened — not two boys</div>
+          <div class="leg"><div class="ldot winner"></div>Two boys — counts toward answer</div>
+        </div>
+      </div>
+      <div class="card answer-card hidden-until-reveal" id="ac-1" data-atab="1">
+        <h3>Answer</h3>
+        <div class="answer-big">1/2</div>
+        <p>B,B families produce two "boy opens door" leaves; mixed families produce one. The weights balance exactly.</p>
+        <div style="font-family:var(--mono);font-size:13px;line-height:2;color:rgba(247,245,240,0.65);margin-top:8px">
+          P(B,B ∩ boy) = ¼<br>
+          P(boy opens) = ½<br>
+          <span style="color:#5dcaa5">→ ¼ ÷ ½ = 1/2</span>
+        </div>
+      </div>
+      <div class="card hidden-until-reveal" id="exp-1">
+        <h3>Why different from problem 1?</h3>
+        <p>Problem 1 conditions on the <em>event</em> "at least one boy exists." This problem conditions on <em>observing</em> a randomly chosen child.</p>
+        <p>B,B families are twice as likely to show you a boy — so they get <em>twice the weight</em> in the conditional, pushing the answer from 1/3 to 1/2.</p>
+      </div>
+    </div>
+    <button class="reveal-btn" id="reveal-1" onclick="reveal(1)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Reveal answer
+    </button>
+  </div>
+
+  <!-- ── PANEL 2 — Tuesday boy + simulator ── -->
+  <div class="panel" id="panel-2">
+    <div class="problem-text">
+      Mr. Jones has two children. At least one is a boy <em>born on Tuesday</em>.
+      What is the probability he has two boys?
+    </div>
+    <div class="tree-wrap">
+      <canvas id="tree2" height="360"></canvas>
+      <p class="hint">Click any node to reveal its branches</p>
+    </div>
+    <div class="cards-row cols-3">
+      <div class="card">
+        <h3>Legend</h3>
+        <div class="legend">
+          <div class="leg"><div class="ldot root"></div>Click to expand branches</div>
+          <div class="leg"><div class="ldot internal"></div>Click to expand branches</div>
+          <div class="leg"><div class="ldot excluded"></div>Pruned — ruled out by condition</div>
+          <div class="leg"><div class="ldot qualifies"></div>Qualifies — not two boys</div>
+          <div class="leg"><div class="ldot winner"></div>Two boys — counts toward answer</div>
+        </div>
+      </div>
+      <div class="card answer-card hidden-until-reveal" id="ac-2" data-atab="2">
+        <h3>Answer</h3>
+        <div class="answer-big">13/27</div>
+        <p>With N=7 days, 13 of the 27 qualifying pairs are two boys.</p>
+        <div class="frow" style="margin-top:10px">
+          <span class="frac" style="color:#85b7eb"><span class="nf">2N−1</span><span class="df">4N−1</span></span>
+          <span class="fop">=</span>
+          <span class="frac" style="color:#85b7eb"><span class="nf">13</span><span class="df">27</span></span>
+        </div>
+      </div>
+      <div class="card hidden-until-reveal" id="exp-2">
+        <h3>Why 13/27?</h3>
+        <p>A B,B family has <em>two chances</em> to produce a Tuesday boy — one per child. So B,B outcomes are over-represented among Tuesday-boy families.</p>
+        <p>As N → ∞ (rarer trait), P → 1/2. Try the slider:</p>
+        <div style="margin-top:10px">
+          <label style="font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:6px">N = <span id="dayVal">7</span> days</label>
+          <input type="range" min="1" max="30" value="7" id="daySlider" oninput="updateDay(this.value)" style="width:100%;accent-color:var(--text)">
+          <div id="dayResult" style="margin-top:8px;font-family:'DM Mono',monospace;font-size:14px;color:#2a5caa;font-weight:500"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reveal button, then simulator link button -->
+    <button class="reveal-btn" id="reveal-2" onclick="reveal(2)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Reveal answer
+    </button>
+    <button class="sim-link-btn" id="sim-link" onclick="openSimulator()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Test this with a simulation →
+    </button>
+
+    <!-- ── SIMULATOR (hidden until sim-link clicked) ── -->
+    <div id="sim-section" class="hidden-until-reveal">
+      <hr class="sim-divider">
+      <div class="sim-header">Simulation</div>
+      <p class="sim-sub">Generate random two-child families. Keep only those with at least one B-Tue. Watch the fraction of two-boy families converge on 13/27.</p>
+
+      <div class="sim-step">
+        <h3>Step-by-step — one trial</h3>
+        <div class="trial-grid">
+          <div class="child-box" id="cb1">
+            <span class="child-label">CHILD 1</span>
+            <span class="child-val" id="cv1">—</span>
+          </div>
+          <div class="child-box" id="cb2">
+            <span class="child-label">CHILD 2</span>
+            <span class="child-val" id="cv2">—</span>
+          </div>
+        </div>
+        <div class="verdict" id="filter-verdict" style="display:none"></div>
+        <div class="verdict" id="bb-verdict" style="display:none"></div>
+        <div class="btn-row">
+          <button class="sim-btn primary" onclick="runOneTrial()">Generate one family</button>
+          <button class="sim-btn secondary" onclick="resetSim()">Reset all</button>
+        </div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-box">
+          <span class="sv" id="s-total">0</span>
+          <span class="sl">Families generated</span>
+        </div>
+        <div class="stat-box">
+          <span class="sv" id="s-kept">0</span>
+          <span class="sl">Kept (≥1 B-Tue)</span>
+        </div>
+        <div class="stat-box">
+          <span class="sv" id="s-bb">0</span>
+          <span class="sl">Two boys among kept</span>
+        </div>
+        <div class="stat-box highlight">
+          <span class="sv" id="s-pct">—</span>
+          <span class="sl">Simulated P(BB | B-Tue)</span>
+        </div>
+      </div>
+
+      <div class="convergence-wrap">
+        <h3>Simulated probability converging on 13/27 ≈ 0.481</h3>
+        <div style="position:relative;height:220px;margin-bottom:8px" id="chart-outer">
+          <canvas id="conv-canvas" style="display:block;width:100%;height:220px"></canvas>
+        </div>
+        <div class="btn-row">
+          <button class="sim-btn primary" onclick="runBatch(100)">+ 100 families</button>
+          <button class="sim-btn primary" onclick="runBatch(1000)">+ 1 000 families</button>
+          <button class="sim-btn primary" onclick="runBatch(10000)">+ 10 000 families</button>
+          <span style="font-size:13px;color:var(--muted);margin-left:4px">Each batch filters to ≥1 B-Tue, then plots running P(BB).</span>
+        </div>
+      </div>
+
+      <div class="cards-row cols-3" style="margin-top:20px">
+        <div class="card">
+          <h3>Why filter, not pre-select?</h3>
+          <p>A common mistake: "generate one B-Tue child, then generate the other." That fixes <em>which</em> child is the Tuesday boy, changing the conditioning. Generate both freely and discard families where neither is B-Tue.</p>
+        </div>
+        <div class="card">
+          <h3>Why so many trials?</h3>
+          <p>The filter keeps only ~1 in 7 families. You need many raw families to accumulate enough kept ones. With only 100 kept, 0.481 is close enough to 0.5 that sampling noise swamps the signal.</p>
+        </div>
+        <div class="card" style="border-color:#8b0000">
+          <h3 style="color:#8b0000">Weekend Problem</h3>
+          <p style="font-weight:500;color:#8b0000">Design a simulation for the door-opening problem.</p>
+          <p>No filtering needed — the generative process matches the conditioning directly. What changes about how you record outcomes?</p>
+        </div>
+      </div>
+    </div><!-- /sim-section -->
+
+  </div><!-- /panel-2 -->
+
+</div><!-- shell -->
+
+<script>
+// ── colours ───────────────────────────────────────────────────────────────
+const C = {
+  root:     { fill:'#1a1814', stroke:'#1a1814', text:'#f7f5f0' },
+  internal: { fill:'#ffffff', stroke:'#c8c3bb', text:'#1a1814' },
+  excluded: { fill:'#f0ede8', stroke:'#c8c3bb', text:'#a8a39a' },
+  qualifies:{ fill:'#dde8f8', stroke:'#a8c4e8', text:'#1a3d7a' },
+  winner:   { fill:'#d6f0e4', stroke:'#8dcfb4', text:'#1a6b45' },
+  branch:'#c8c3bb', edgeLbl:'#8a8479', subWin:'#1a6b45', subDef:'#8a8479',
+};
+
+// ── Node ──────────────────────────────────────────────────────────────────
+class Node {
+  constructor(label, kind, sub, children) {
+    this.label=label; this.kind=kind; this.sub=sub||'';
+    this.children=children||[]; this.expanded=false;
+    this.x=0; this.y=0; this.w=0; this.h=36;
+  }
+  isLeaf()       { return this.children.length===0; }
+  isExpandable() { return !this.isLeaf()&&!this.expanded; }
+}
+
+// ── Tree ──────────────────────────────────────────────────────────────────
+class Tree {
+  constructor(id,root,rowY) {
+    this.id=id; this.root=root; this.rowY=rowY;
+    this.dpr=window.devicePixelRatio||1;
+    this._origH=null;
+    this._init();
+    this.canvas.addEventListener('click',e=>this._click(e));
+    this.canvas.addEventListener('mousemove',e=>this._move(e));
+  }
+  _init() {
+    this.canvas=document.getElementById(this.id);
+    if(!this._origH) this._origH=parseInt(this.canvas.getAttribute('height'));
+    this.H=this._origH;
+    const shell=document.querySelector('.shell');
+    const sw=shell?(shell.getBoundingClientRect().width||shell.offsetWidth):900;
+    this.W=Math.max(sw-42,400);
+    this.canvas.width=this.W*this.dpr;
+    this.canvas.height=this.H*this.dpr;
+    this.canvas.style.width='100%';
+    this.canvas.style.height=this.H+'px';
+    this.ctx=this.canvas.getContext('2d');
+    this.ctx.scale(this.dpr,this.dpr);
+    this._draw();
+  }
+  _leafCount(node) {
+    if(!node.expanded||node.isLeaf()) return 1;
+    return node.children.reduce((s,c)=>s+this._leafCount(c.node),0);
+  }
+  _measure(node) {
+    const bold=node.kind==='root'||node.kind==='winner';
+    this.ctx.font=(bold?'500':'400')+' 14px "DM Sans",sans-serif';
+    node.w=Math.max(this.ctx.measureText(node.label).width+32,70);
+  }
+  _layout(node,depth,xL,xR) {
+    node.y=this.rowY[depth]!==undefined?this.rowY[depth]:depth*100+20;
+    if(!node.expanded||node.isLeaf()){node.x=(xL+xR)/2;this._measure(node);return;}
+    const tot=node.children.reduce((s,c)=>s+this._leafCount(c.node),0);
+    let cur=xL;
+    node.children.forEach(c=>{
+      const share=(xR-xL)*this._leafCount(c.node)/tot;
+      this._layout(c.node,depth+1,cur,cur+share); cur+=share;
+    });
+    const xs=node.children.map(c=>c.node.x);
+    node.x=(Math.min(...xs)+Math.max(...xs))/2;
+    this._measure(node);
+  }
+  _draw() {
+    this.ctx.clearRect(0,0,this.W,this.H);
+    this._layout(this.root,0,12,this.W-12);
+    this._subtree(this.root);
+  }
+  _subtree(node) {
+    if(node.expanded) node.children.forEach(c=>{this._edge(node,c.node,c.edgeLabel);this._subtree(c.node);});
+    this._node(node);
+  }
+  _edge(p,c,label) {
+    const ctx=this.ctx;
+    ctx.beginPath(); ctx.moveTo(p.x,p.y+p.h); ctx.lineTo(c.x,c.y);
+    ctx.strokeStyle=C.branch; ctx.lineWidth=1; ctx.setLineDash([]); ctx.stroke();
+    if(label){
+      const mx=(p.x+c.x)/2, my=(p.y+p.h+c.y)/2-6;
+      ctx.font='12px "DM Sans",sans-serif'; ctx.fillStyle=C.edgeLbl;
+      ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.fillText(label,mx,my);
+    }
+  }
+  _node(node) {
+    const ctx=this.ctx, s=C[node.kind];
+    const x=node.x-node.w/2, y=node.y, w=node.w, h=node.h, r=6;
+    const rr=()=>{
+      ctx.beginPath();
+      ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+      ctx.arcTo(x+w,y,x+w,y+h,r); ctx.lineTo(x+w,y+h-r);
+      ctx.arcTo(x+w,y+h,x,y+h,r); ctx.lineTo(x+r,y+h);
+      ctx.arcTo(x,y+h,x,y,r); ctx.lineTo(x,y+r);
+      ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+    };
+    if(node.isExpandable()){
+      ctx.save(); ctx.shadowColor='rgba(0,0,0,0.12)'; ctx.shadowBlur=8; ctx.shadowOffsetY=2;
+      rr(); ctx.fillStyle=s.fill; ctx.fill(); ctx.restore();
+    }
+    rr(); ctx.fillStyle=s.fill; ctx.fill();
+    ctx.strokeStyle=s.stroke; ctx.lineWidth=1; ctx.setLineDash([]); ctx.stroke();
+    if(node.isExpandable()){
+      rr(); ctx.strokeStyle='#888780'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    const bold=node.kind==='root'||node.kind==='winner';
+    ctx.font=(bold?'500':'400')+' 14px "DM Sans",sans-serif';
+    ctx.fillStyle=s.text; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(node.label, node.isExpandable()?node.x-7:node.x, y+h/2);
+    if(node.isExpandable()){
+      ctx.font='500 15px "DM Sans",sans-serif'; ctx.fillStyle='#888780';
+      ctx.textAlign='right'; ctx.fillText('+',x+w-7,y+h/2);
+    }
+    if(node.sub){
+      ctx.font='500 13px "DM Mono",monospace';
+      ctx.fillStyle=node.kind==='winner'?C.subWin:C.subDef;
+      ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.fillText(node.sub,node.x,y+h+5);
+    }
+  }
+  _hit(node,px,py) {
+    if(px>=node.x-node.w/2&&px<=node.x+node.w/2&&py>=node.y&&py<=node.y+node.h) return node;
+    if(node.expanded) for(const c of node.children){const h=this._hit(c.node,px,py);if(h)return h;}
+    return null;
+  }
+  _coords(e) {
+    const r=this.canvas.getBoundingClientRect(), s=this.W/r.width;
+    return {x:(e.clientX-r.left)*s, y:(e.clientY-r.top)*s};
+  }
+  _click(e) {
+    const {x,y}=this._coords(e), hit=this._hit(this.root,x,y);
+    if(hit&&hit.isExpandable()){hit.expanded=true;this._draw();}
+  }
+  _move(e) {
+    const {x,y}=this._coords(e), hit=this._hit(this.root,x,y);
+    this.canvas.style.cursor=(hit&&hit.isExpandable())?'pointer':'default';
+  }
+  reinit() { this._init(); }
+  resize() {
+    const shell=document.querySelector('.shell');
+    const sw=shell?(shell.getBoundingClientRect().width||shell.offsetWidth):900;
+    const w=Math.max(sw-42,400);
+    if(Math.abs(w-this.W)<2) return;
+    this.W=w; this.canvas.width=this.W*this.dpr;
+    this.ctx=this.canvas.getContext('2d'); this.ctx.scale(this.dpr,this.dpr);
+    this._draw();
+  }
+}
+
+// ── Tree data ─────────────────────────────────────────────────────────────
+
+function buildTree0() {
+  const GG=new Node('G, G','excluded','excluded');
+  const GB=new Node('G, B','qualifies','qualifies  (prob ¼)');
+  const BG=new Node('B, G','qualifies','qualifies  (prob ¼)');
+  const BB=new Node('B, B','winner','two boys!  (prob ¼)');
+  const cG=new Node('1st child: G','internal','',[{edgeLabel:'2nd = G',node:GG},{edgeLabel:'2nd = B',node:GB}]);
+  const cB=new Node('1st child: B','internal','',[{edgeLabel:'2nd = G',node:BG},{edgeLabel:'2nd = B',node:BB}]);
+  return new Node('Two children','root','',[{edgeLabel:'child 1 = G',node:cG},{edgeLabel:'child 1 = B',node:cB}]);
+}
+
+// Panel 1 = door problem (was tree2)
+function buildTree1() {
+  const gg1=new Node('G opens','excluded',''), gg2=new Node('G opens','excluded','');
+  const nGG=new Node('G,G  family','excluded','',[{edgeLabel:'child 1 (½)',node:gg1},{edgeLabel:'child 2 (½)',node:gg2}]);
+  const gb1=new Node('G opens','excluded',''), gb2=new Node('B opens','qualifies','¼ · ½ = ⅛');
+  const nGB=new Node('G,B  family','internal','',[{edgeLabel:'G child (½)',node:gb1},{edgeLabel:'B child (½)',node:gb2}]);
+  const bg1=new Node('B opens','qualifies','¼ · ½ = ⅛'), bg2=new Node('G opens','excluded','');
+  const nBG=new Node('B,G  family','internal','',[{edgeLabel:'B child (½)',node:bg1},{edgeLabel:'G child (½)',node:bg2}]);
+  const bb1=new Node('B opens','winner','¼ · ½ = ⅛'), bb2=new Node('B opens','winner','¼ · ½ = ⅛');
+  const nBB=new Node('B,B  family','internal','',[{edgeLabel:'child 1 (½)',node:bb1},{edgeLabel:'child 2 (½)',node:bb2}]);
+  return new Node('Family  +  who opens door','root','',[
+    {edgeLabel:'G,G (¼)',node:nGG},{edgeLabel:'G,B (¼)',node:nGB},
+    {edgeLabel:'B,G (¼)',node:nBG},{edgeLabel:'B,B (¼)',node:nBB}
+  ]);
+}
+
+// Panel 2 = Tuesday boy (was tree1)
+function buildTree2() {
+  const L1=new Node('B-Tue, G','qualifies','×7 qualify');
+  const L2=new Node('B-Tue, B-Tue','winner','×1  two boys');
+  const L3=new Node('B-Tue, B-other','winner','×6  two boys');
+  const nBT=new Node('Child 1 = B-Tue','internal','',[
+    {edgeLabel:'+ G  (×7)',node:L1},{edgeLabel:'+ B-Tue',node:L2},{edgeLabel:'+ B-other  (×6)',node:L3}
+  ]);
+  const L4=new Node('B-other, B-Tue','winner','×6  two boys');
+  const nBO=new Node('Child 1 = B-other  (×6)','internal','',[{edgeLabel:'+ B-Tue',node:L4}]);
+  const L5=new Node('G, B-Tue','qualifies','×7 qualify');
+  const nG=new Node('Child 1 = G  (×7)','internal','',[{edgeLabel:'+ B-Tue',node:L5}]);
+  return new Node('Two children  (14 types each)','root','',[
+    {edgeLabel:'child 1 = B-Tue',node:nBT},
+    {edgeLabel:'child 1 = B-other ×6',node:nBO},
+    {edgeLabel:'child 1 = G ×7',node:nG}
+  ]);
+}
+
+const t0=new Tree('tree0',buildTree0(),[20,120,220]);
+const t1=new Tree('tree1',buildTree1(),[20,120,220,315]);
+const t2=new Tree('tree2',buildTree2(),[20,120,220,310]);
+
+// ── Panel switching ───────────────────────────────────────────────────────
+function showPanel(i) {
+  document.querySelectorAll('.panel').forEach((p,j)=>p.classList.toggle('active',i===j));
+  document.querySelectorAll('.prob-tab').forEach((t,j)=>t.classList.toggle('active',i===j));
+  if(i<3) setTimeout(()=>[t0,t1,t2][i].reinit(),20);
+}
+
+// ── Reveal ────────────────────────────────────────────────────────────────
+function reveal(i) {
+  ['ac-','exp-'].forEach(pre=>{
+    const el=document.getElementById(pre+i);
+    if(el) el.classList.remove('hidden-until-reveal');
+  });
+  document.querySelector('.prob-tab[data-tab="'+i+'"]').classList.remove('ans-locked');
+  const btn=document.getElementById('reveal-'+i);
+  btn.classList.add('done');
+  btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Answer revealed';
+  btn.disabled=true;
+  // show sim link only on panel 2
+  if(i===2) {
+    const sl=document.getElementById('sim-link');
+    if(sl) sl.classList.add('visible');
+  }
+}
+
+// ── Open simulator ────────────────────────────────────────────────────────
+function openSimulator() {
+  const sec=document.getElementById('sim-section');
+  sec.classList.remove('hidden-until-reveal');
+  const sl=document.getElementById('sim-link');
+  sl.style.display='none';
+  setTimeout(()=>{
+    sec.scrollIntoView({behavior:'smooth',block:'start'});
+    initConvCanvas();
+  },50);
+}
+
+// ── Day slider ────────────────────────────────────────────────────────────
+function updateDay(N) {
+  N=+N;
+  document.getElementById('dayVal').textContent=N;
+  const bb=2*N-1,tot=4*N-1;
+  document.getElementById('dayResult').textContent=`P = ${bb}/${tot} ≈ ${(bb/tot).toFixed(4)}`;
+}
+updateDay(7);
+
+window.addEventListener('resize',()=>{t0.resize();t1.resize();t2.resize();initConvCanvas();});
+
+// ── Simulator ─────────────────────────────────────────────────────────────
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const THEORY=13/27;
+let simTotal=0,simKept=0,simBB=0,convHistory=[];
+
+function randomChild() {
+  const sex=Math.random()<0.5?'B':'G';
+  const day=DAYS[Math.floor(Math.random()*7)];
+  return {sex,day,isBTue:sex==='B'&&day==='Tue'};
+}
+function childLabel(c){ return c.sex==='B'?`Boy (${c.day})`:`Girl (${c.day})`; }
+function childClass(c){ if(c.isBTue)return'boy-tue'; if(c.sex==='B')return'boy-other'; return'girl'; }
+
+function updateStats() {
+  document.getElementById('s-total').textContent=simTotal.toLocaleString();
+  document.getElementById('s-kept').textContent=simKept.toLocaleString();
+  document.getElementById('s-bb').textContent=simBB.toLocaleString();
+  document.getElementById('s-pct').textContent=simKept>0?(simBB/simKept).toFixed(4):'—';
+}
+
+function runOneTrial() {
+  const c1=randomChild(),c2=randomChild();
+  simTotal++;
+  document.getElementById('cb1').className='child-box '+childClass(c1);
+  document.getElementById('cb2').className='child-box '+childClass(c2);
+  document.getElementById('cv1').textContent=childLabel(c1);
+  document.getElementById('cv2').textContent=childLabel(c2);
+  const fv=document.getElementById('filter-verdict');
+  const bv=document.getElementById('bb-verdict');
+  const qualifies=c1.isBTue||c2.isBTue;
+  fv.style.display='block';
+  if(!qualifies){
+    fv.className='verdict dropped'; fv.textContent='✗ Discarded — neither child is a boy born on Tuesday';
+    bv.style.display='none';
+  } else {
+    simKept++;
+    fv.className='verdict kept'; fv.textContent='✓ Kept — at least one child is a boy born on Tuesday';
+    bv.style.display='block';
+    const isBB=c1.sex==='B'&&c2.sex==='B';
+    if(isBB){simBB++;bv.className='verdict bb';bv.textContent='★ Two boys — counts toward numerator';}
+    else{bv.className='verdict notbb';bv.textContent='· Not two boys — counts toward denominator only';}
+    convHistory.push(simBB/simKept);
+    drawConv();
+  }
+  updateStats();
+}
+
+function runBatch(n) {
+  for(let i=0;i<n;i++){
+    const c1=randomChild(),c2=randomChild(); simTotal++;
+    if(c1.isBTue||c2.isBTue){
+      simKept++;
+      if(c1.sex==='B'&&c2.sex==='B') simBB++;
+      convHistory.push(simBB/simKept);
+    }
+  }
+  updateStats(); drawConv();
+}
+
+function resetSim() {
+  simTotal=0;simKept=0;simBB=0;convHistory=[];
+  document.getElementById('cb1').className='child-box';
+  document.getElementById('cb2').className='child-box';
+  document.getElementById('cv1').textContent='—';
+  document.getElementById('cv2').textContent='—';
+  document.getElementById('filter-verdict').style.display='none';
+  document.getElementById('bb-verdict').style.display='none';
+  updateStats(); drawConv();
+}
+
+// ── Convergence chart ─────────────────────────────────────────────────────
+let convCtx=null,convW=0,convH=220;
+const convDPR=window.devicePixelRatio||1;
+
+function initConvCanvas() {
+  const canvas=document.getElementById('conv-canvas');
+  const outer=document.getElementById('chart-outer');
+  if(!canvas||!outer) return;
+  convW=outer.offsetWidth||600;
+  canvas.width=convW*convDPR; canvas.height=convH*convDPR;
+  canvas.style.width=convW+'px'; canvas.style.height=convH+'px';
+  convCtx=canvas.getContext('2d'); convCtx.scale(convDPR,convDPR);
+  drawConv();
+}
+
+function drawConv() {
+  if(!convCtx) return;
+  const ctx=convCtx, W=convW, H=convH;
+  const PAD={top:20,right:20,bottom:40,left:52};
+  const pw=W-PAD.left-PAD.right, ph=H-PAD.top-PAD.bottom;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#f7f5f0'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#ffffff'; ctx.fillRect(PAD.left,PAD.top,pw,ph);
+  // gridlines
+  [0.3,0.4,0.5,0.6].forEach(v=>{
+    const gy=PAD.top+ph*(1-v);
+    ctx.beginPath(); ctx.moveTo(PAD.left,gy); ctx.lineTo(PAD.left+pw,gy);
+    ctx.strokeStyle='#e2ddd6'; ctx.lineWidth=1; ctx.setLineDash([]); ctx.stroke();
+    ctx.font='11px "DM Mono",monospace'; ctx.fillStyle='#8a8479';
+    ctx.textAlign='right'; ctx.textBaseline='middle';
+    ctx.fillText(v.toFixed(1),PAD.left-6,gy);
+  });
+  // theory line
+  const ty=PAD.top+ph*(1-THEORY);
+  ctx.beginPath(); ctx.moveTo(PAD.left,ty); ctx.lineTo(PAD.left+pw,ty);
+  ctx.strokeStyle='#1a6b45'; ctx.lineWidth=1.5; ctx.setLineDash([5,4]); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font='11px "DM Mono",monospace'; ctx.fillStyle='#1a6b45';
+  ctx.textAlign='right'; ctx.textBaseline='bottom';
+  ctx.fillText('13/27 = 0.481',PAD.left-6,ty-2);
+  // x label
+  ctx.font='11px "DM Sans",sans-serif'; ctx.fillStyle='#8a8479';
+  ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText('Kept families (those with ≥1 B-Tue)',PAD.left+pw/2,H-4);
+  if(convHistory.length===0){
+    ctx.font='13px "DM Sans",sans-serif'; ctx.fillStyle='#c8c3bb';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('Run the simulation to see convergence',PAD.left+pw/2,PAD.top+ph/2);
+    return;
+  }
+  const hist=convHistory;
+  const step=hist.length>2000?Math.ceil(hist.length/2000):1;
+  const pts=[];
+  for(let i=0;i<hist.length;i+=step) pts.push({i:i+1,v:hist[i]});
+  if(pts[pts.length-1].i!==hist.length) pts.push({i:hist.length,v:hist[hist.length-1]});
+  const xMax=Math.max(hist.length,10);
+  ctx.beginPath();
+  pts.forEach((p,idx)=>{
+    const cx=PAD.left+(p.i/xMax)*pw, cy=PAD.top+ph*(1-Math.min(Math.max(p.v,0),1));
+    if(idx===0) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+  });
+  ctx.strokeStyle='#2a5caa'; ctx.lineWidth=1.5; ctx.setLineDash([]); ctx.stroke();
+  const last=pts[pts.length-1];
+  const ex=PAD.left+(last.i/xMax)*pw, ey=PAD.top+ph*(1-Math.min(Math.max(last.v,0),1));
+  ctx.beginPath(); ctx.arc(ex,ey,4,0,Math.PI*2); ctx.fillStyle='#2a5caa'; ctx.fill();
+  ctx.font='500 12px "DM Mono",monospace'; ctx.fillStyle='#2a5caa';
+  ctx.textAlign=ex>PAD.left+pw*0.7?'right':'left'; ctx.textBaseline='middle';
+  ctx.fillText(last.v.toFixed(4),ex+(ctx.textAlign==='left'?8:-8),ey);
+  const xTicks=[1,Math.round(xMax/4),Math.round(xMax/2),Math.round(3*xMax/4),xMax];
+  ctx.font='11px "DM Mono",monospace'; ctx.fillStyle='#8a8479';
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  xTicks.forEach(t=>{
+    const tx=PAD.left+(t/xMax)*pw;
+    ctx.fillText(t>=1000?(t/1000).toFixed(0)+'k':t,tx,PAD.top+ph+4);
+  });
+}
+</script>
+</body>
+</html>
